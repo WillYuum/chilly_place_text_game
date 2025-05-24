@@ -30,4 +30,9 @@ export class EmptySlot extends Component {
             width: 2,
         });
     }
+
+    public disableSlot(): void {
+        this._type = SlotType.Used;
+        this._visual.clear();
+    }
 }

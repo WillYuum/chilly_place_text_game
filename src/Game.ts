@@ -19,22 +19,19 @@ export function startGame(app: Application) {
 
         const distanceY = Math.abs((emptySlotPosition?.y ?? 0) - (letterPosition?.y ?? 0));
 
-        const isInRange = distanceY < 200;
-
-        console.log("isInRange", isInRange, "distanceY", distanceY, "emptySlotPosition", emptySlotPosition, "letterPosition", letterPosition);
+        const isInRange = distanceY < 45;
 
         if (isThrown && isInRange) {
             currentThrowableLetter?.gameObject?.getComponent(ThrowBehavior)?.DisableThrowBehavior();
+            currentEmptySlot?.disableSlot();
         }
     }
 
 
-    app.canvas.addEventListener('pointerdown', () => onHandleInteraction);
-    window.addEventListener('keydown', (e) => {
-        if (e.code === 'Space') {
-            onHandleInteraction();
-        }
-    });
+    const interactionKeyBinding = new KeyBinding('Space', () => onHandleInteraction(), 'keydown');
+    const interactionKeyBindingUp = new KeyBinding('0', () => onHandleInteraction(), 'pointerdown');
+
+
 
 
 
@@ -78,4 +75,52 @@ function createThrowableLetterGameObject(app: Application, assignedSlotPos: Game
     return letterGameObject;
 }
 
+
+export class KeyBinding {
+    constructor(
+        private key: string,
+        private action: () => void,
+        private eventType: 'keydown' | 'keyup' | 'pointerdown' | 'pointerup',
+    ) {
+        this.mapKeysToAction();
+    }
+
+    private onKeyEvent = (e: PointerEvent | KeyboardEvent | any) => {
+        const isPointerEvent = e instanceof PointerEvent;
+        const isKeyEvent = e instanceof KeyboardEvent;
+
+        switch (true) {
+            case isPointerEvent:
+                if (e.button.toString() === this.key) {
+                    this.action();
+                }
+                break;
+            case isKeyEvent:
+                if (e.code === this.key) {
+                    this.action();
+                }
+                break;
+            default:
+                console.warn("Unhandled event type:", e);
+                return;
+        }
+    };
+
+
+    public toggle(boolean: boolean) {
+        if (boolean) {
+            this.mapKeysToAction();
+        } else {
+            this.unbindKey();
+        }
+    }
+
+    private mapKeysToAction() {
+        window.addEventListener(this.eventType, this.onKeyEvent);
+    }
+
+    private unbindKey() {
+        window.removeEventListener(this.eventType, this.onKeyEvent);
+    }
+}
 
