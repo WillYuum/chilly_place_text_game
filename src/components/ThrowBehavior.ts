@@ -5,21 +5,26 @@ const GRAVITY = 9.81;
 export class ThrowBehavior extends Component {
 
     private velocity: GamePlayVector2 = new GamePlayVector2(0, 1.5);
-    private isThrown: boolean = false;
+    public IsThrown: boolean = false;
 
 
     onUpdate(deltaTime: number): void {
-        if (this.isThrown) {
+        if (this.IsThrown) {
             this.moveObject(deltaTime);
         }
     }
 
 
     public throwObject(): void {
-        if (!this.isThrown) {
-            this.isThrown = true;
+        if (!this.IsThrown) {
+            this.IsThrown = true;
             this.velocity.y = 1.5; // Set an initial upward velocity
         }
+    }
+
+    public DisableThrowBehavior(): void {
+        this.IsThrown = false;
+        this.velocity.y = 0; // Reset the velocity when throwing is disabled
     }
 
 

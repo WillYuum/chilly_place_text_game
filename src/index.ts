@@ -31,6 +31,8 @@ onAppInit.then(() => {
     PlayOneLifeCycle(deltaTime);
   });
 
+
+
   startGame(app);
 
 
@@ -38,5 +40,3 @@ onAppInit.then(() => {
 }).catch((error) => {
   console.error('Error initializing PixiJS application:', error);
 });
-
-

@@ -1,5 +1,6 @@
 import { Component } from "@willyuum/pixi-gameobject-system";
 import { Graphics, Bounds } from "pixi.js";
+import { ThrowBehavior } from "./ThrowBehavior";
 
 export class ThrowableLetter extends Component {
     private squareBounds: Graphics = new Graphics();
@@ -7,6 +8,12 @@ export class ThrowableLetter extends Component {
     onAwake(): void {
         this.drawLetter();
         this.gameObject?.addVisualComponent(this.squareBounds);
+    }
+
+
+    public isThrown(): boolean {
+        const throwBehavior = this.gameObject?.getComponent(ThrowBehavior);
+        return throwBehavior ? throwBehavior.IsThrown : false;
     }
 
     private drawLetter(): void {

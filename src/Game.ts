@@ -6,8 +6,36 @@ import { EmptySlot } from "./components/EmptySlot";
 import { GamePlayVector2 } from "./types";
 
 
-
 export function startGame(app: Application) {
+    let currentEmptySlot: EmptySlot | undefined = undefined;
+    let currentThrowableLetter: ThrowableLetter | undefined = undefined;
+
+
+    const onHandleInteraction = () => {
+        const isThrown = currentThrowableLetter?.isThrown;
+        // const isNearEmptySlot = currentEmptySlot?.gameObject?.holder.getBounds().contains(currentTrhowableLetter?.gameObject.holder.x ?? 0, currentTrhowableLetter?.gameObject.holder.y ?? 0) ?? false;
+        const emptySlotPosition = currentEmptySlot?.gameObject?.holder.position;
+        const letterPosition = currentThrowableLetter?.gameObject?.holder.position;
+
+        const distanceY = Math.abs((emptySlotPosition?.y ?? 0) - (letterPosition?.y ?? 0));
+
+        const isInRange = distanceY < 200;
+
+        console.log("isInRange", isInRange, "distanceY", distanceY, "emptySlotPosition", emptySlotPosition, "letterPosition", letterPosition);
+
+        if (isThrown && isInRange) {
+            currentThrowableLetter?.gameObject?.getComponent(ThrowBehavior)?.DisableThrowBehavior();
+        }
+    }
+
+
+    app.canvas.addEventListener('pointerdown', () => onHandleInteraction);
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') {
+            onHandleInteraction();
+        }
+    });
+
 
 
     const newEmptySlot = createSlotGameObject(app);
@@ -17,6 +45,9 @@ export function startGame(app: Application) {
 
     const bottomScreenBounds = new Bounds(0, 0, app.screen.width, app.screen.height);
     const throwAbleObject = createThrowableLetterGameObject(app, new GamePlayVector2(newEmptySlot.holder.x, bottomScreenBounds.height - 100));
+
+    currentThrowableLetter = throwAbleObject.getComponent(ThrowableLetter);
+    currentEmptySlot = newEmptySlot.getComponent(EmptySlot);
 }
 
 
@@ -40,9 +71,11 @@ function createThrowableLetterGameObject(app: Application, assignedSlotPos: Game
     const throwPhysicsComponent = new ThrowBehavior();
     letterGameObject.addComponent(throwPhysicsComponent);
 
-    // setTimeout(() => {
-    //     throwPhysicsComponent.throwObject();
-    // }, 1000);
+    setTimeout(() => {
+        throwPhysicsComponent.throwObject();
+    }, 1000);
 
     return letterGameObject;
 }
+
+
