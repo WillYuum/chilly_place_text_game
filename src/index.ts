@@ -9,10 +9,12 @@ declare global {
 
 
 
-const app = new Application();
+
+export const PixiApp = new Application();
 
 
-const onAppInit = app.init({
+
+const onAppInit = PixiApp.init({
   width: 1920,
   height: 1080,
   backgroundColor: 0x1099bb,
@@ -21,10 +23,10 @@ const onAppInit = app.init({
 
 
 onAppInit.then(() => {
-  document.body.appendChild(app.canvas);
+  document.body.appendChild(PixiApp.canvas);
   console.log('PixiJS application initialized and added to the DOM.');
 
-  app.ticker.add((delta) => {
+  PixiApp.ticker.add((delta) => {
     // Update logic for the application can go here
     // For example, you can update game objects or handle animations
     const deltaTime = delta.deltaTime
@@ -33,10 +35,10 @@ onAppInit.then(() => {
 
 
 
-  startGame(app);
+  startGame();
 
 
-  globalThis.__PIXI_APP__ = app;
+  globalThis.__PIXI_APP__ = PixiApp;
 }).catch((error) => {
   console.error('Error initializing PixiJS application:', error);
 });

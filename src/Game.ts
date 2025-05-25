@@ -5,82 +5,120 @@ import { ThrowableLetter } from "./components/ThrowableLetter";
 import { EmptySlot } from "./components/EmptySlot";
 import { GamePlayVector2 } from "./types";
 import { KeyBinding } from "./KeyBinding";
+import { PixiApp } from ".";
 
 
+type GameAction =
+    | { type: 'INIT'; sentence: string[] }
+    | { type: 'THROW_LETTER'; }
+    | { type: 'HANDLE_INTERACTION' };
 
 
-export function startGame(app: Application) {
-    const sentenceToDisplay = "Hello World!"
-    const removeWhitespaceSentence = sentenceToDisplay.replace(/\s+/g, '');
-    const splitSentence = removeWhitespaceSentence.split('');
+type GameState = {
+    sentence: string[];
+    currentIndex: number;
+    slots: GameObject[];
+    currentSlot?: EmptySlot;
+    currentLetter?: ThrowableLetter;
+};
 
-    console.log("Sentence to display:", splitSentence);
+let gameState: GameState = {
+    sentence: [],
+    currentIndex: 0,
+    slots: [],
+};
 
-    const spacingBetweenSlots = 110;
 
+function reducer(state: GameState, action: GameAction): GameState {
+    switch (action.type) {
+        case 'INIT': {
+            const slots = action.sentence.map((_, i) => {
+                const slot = createSlotGameObject(PixiApp);
+                slot.holder.position.set((i * 110) + 100, 100);
+                return slot;
+            });
 
-    let spawnedSlots: GameObject[] = [];
-    const displayAllEmptySlots = (app: Application, text: string[]) => {
-        for (let i = 0; i < text.length; i++) {
-            const newEmptySlot = createSlotGameObject(app);
-            newEmptySlot.holder.x = (i * spacingBetweenSlots) + 100;
-            newEmptySlot.holder.y = 100
-            spawnedSlots.push(newEmptySlot);
+            return {
+                ...state,
+                sentence: action.sentence,
+                slots,
+                currentIndex: 0,
+            };
         }
 
-    }
+        case 'THROW_LETTER': {
+            const currentSlot = state.slots[state.currentIndex];
+            const position = new GamePlayVector2(currentSlot.holder.x, PixiApp.screen.height - 100);
+            const letterGO = createThrowableLetterGameObject(PixiApp, position);
+            letterGO.getComponent(ThrowBehavior)?.throwObject();
 
-    let currentEmptySlot: EmptySlot | undefined = undefined;
-    let currentThrowableLetter: ThrowableLetter | undefined = undefined;
-    let currentFocusedSlotIndex = 0;
+            const newGameInput = new ThrowLetterAction();
+            newGameInput.enableInputHandlers();
 
-    const onHandleInteraction = () => {
-        const isThrown = currentThrowableLetter?.isThrown;
-        const emptySlotPosition = currentEmptySlot?.gameObject?.holder.position;
-        const letterPosition = currentThrowableLetter?.gameObject?.holder.position;
 
-        const distanceY = Math.abs((emptySlotPosition?.y ?? 0) - (letterPosition?.y ?? 0));
+            return {
+                ...state,
+                currentSlot: currentSlot.getComponent(EmptySlot),
+                currentLetter: letterGO.getComponent(ThrowableLetter),
+            };
+        }
 
-        const isInRange = distanceY < 45;
+        case 'HANDLE_INTERACTION': {
+            const { currentSlot, currentLetter, currentIndex, slots } = state;
 
-        if (isThrown && isInRange) {
-            currentThrowableLetter?.gameObject?.getComponent(ThrowBehavior)?.DisableThrowBehavior();
-            currentThrowableLetter?.destroy();
-            currentEmptySlot?.disableSlot();
+            console.log("Handling interaction for index:", currentIndex);
 
-            currentFocusedSlotIndex += 1;
-            if (currentFocusedSlotIndex >= spawnedSlots.length) {
-                //Should end the game here
+            const slotY = currentSlot?.gameObject?.holder.y ?? 0;
+            const letterY = currentLetter?.gameObject?.holder.y ?? 0;
+            const isThrown = currentLetter?.isThrown;
+            const inRange = Math.abs(slotY - letterY) < 45;
+
+            if (!isThrown || !inRange) return state;
+
+            currentLetter?.gameObject?.getComponent(ThrowBehavior)?.DisableThrowBehavior();
+            currentLetter?.destroy();
+            currentSlot?.disableSlot();
+
+            if (currentIndex + 1 >= slots.length) {
                 console.log("Game Over! All letters placed.");
-                return;
-            } else {
-                sendLetterToSlot(currentFocusedSlotIndex);
+                return { ...state, currentIndex: currentIndex + 1 };
             }
+
+            return { ...state, currentIndex: currentIndex + 1 };
+        }
+
+        default: {
+            // Exhaustive check for action
+            const _exhaustiveCheck: never = action;
+            console.warn("Unhandled state", _exhaustiveCheck);
+            return state;
         }
     }
+}
+
+export function startGame() {
+
+    const clean = "Hello World!".replace(/\s+/g, '').split('');
+    gameState = reducer(gameState, { type: 'INIT', sentence: clean });
+    gameState = reducer(gameState, { type: 'THROW_LETTER' });
+}
 
 
-    const sendLetterToSlot = (index: number) => {
-        if (index < 0 || index >= spawnedSlots.length) {
-            console.warn("Index out of bounds:", index);
-            return;
-        }
-        const currentSlot = spawnedSlots[index];
-        const bottomScreenBounds = new Bounds(0, 0, app.screen.width, app.screen.height);
-        const throwAbleObject = createThrowableLetterGameObject(app, new GamePlayVector2(currentSlot.holder.x, bottomScreenBounds.height - 100));
-        throwAbleObject.getComponent(ThrowBehavior)?.throwObject();
 
-        currentEmptySlot = currentSlot.getComponent(EmptySlot);
-        currentThrowableLetter = throwAbleObject.getComponent(ThrowableLetter);
+class ThrowLetterAction {
+    keyBindings: KeyBinding[] = [];
+    enableInputHandlers() {
+        this.keyBindings = [
+            new KeyBinding('Space', () => reducer(gameState, { type: 'HANDLE_INTERACTION' }), 'keydown'),
+            new KeyBinding('0', () => reducer(gameState, { type: 'HANDLE_INTERACTION' }), 'pointerdown'),
+        ]
     }
 
-    const bindedKeys = [
-        new KeyBinding('Space', () => onHandleInteraction(), 'keydown'),
-        new KeyBinding('0', () => onHandleInteraction(), 'pointerdown'),
-    ];
+    disableInputHandlers() {
+        this.keyBindings.forEach(binding => binding.toggle(false));
+        this.keyBindings = [];
+    }
 
-    displayAllEmptySlots(app, splitSentence);
-    sendLetterToSlot(currentFocusedSlotIndex);
 }
 
 
