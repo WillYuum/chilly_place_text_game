@@ -6,9 +6,28 @@ import { EmptySlot } from "./components/EmptySlot";
 import { GamePlayVector2 } from "./types";
 
 
+
+
 export function startGame(app: Application) {
-    let currentEmptySlot: EmptySlot | undefined = undefined;
-    let currentThrowableLetter: ThrowableLetter | undefined = undefined;
+    const sentenceToDisplay = "Hello World!"
+    const removeWhitespaceSentence = sentenceToDisplay.replace(/\s+/g, '');
+    const splitSentence = removeWhitespaceSentence.split('');
+
+    console.log("Sentence to display:", splitSentence);
+
+    const spacingBetweenSlots = 110;
+
+
+    let spawnedSlots: GameObject[] = [];
+    const displayAllEmptySlots = (app: Application, text: string[]) => {
+        for (let i = 0; i < text.length; i++) {
+            const newEmptySlot = createSlotGameObject(app);
+            newEmptySlot.holder.x = (i * spacingBetweenSlots) + 100;
+            newEmptySlot.holder.y = 100
+            spawnedSlots.push(newEmptySlot);
+        }
+
+    }
 
 
     const onHandleInteraction = () => {
@@ -27,24 +46,31 @@ export function startGame(app: Application) {
         }
     }
 
+    let currentEmptySlot: EmptySlot | undefined = undefined;
+    let currentThrowableLetter: ThrowableLetter | undefined = undefined;
 
-    const interactionKeyBinding = new KeyBinding('Space', () => onHandleInteraction(), 'keydown');
-    const interactionKeyBindingUp = new KeyBinding('0', () => onHandleInteraction(), 'pointerdown');
+    let currentFocusedSlotIndex = 0;
+    const sendLetterToSlot = (index: number) => {
+        if (index < 0 || index >= spawnedSlots.length) {
+            console.warn("Index out of bounds:", index);
+            return;
+        }
+        const currentSlot = spawnedSlots[index];
+        const bottomScreenBounds = new Bounds(0, 0, app.screen.width, app.screen.height);
+        const throwAbleObject = createThrowableLetterGameObject(app, new GamePlayVector2(currentSlot.holder.x, bottomScreenBounds.height - 100));
+        throwAbleObject.getComponent(ThrowBehavior)?.throwObject();
+
+        currentEmptySlot = currentSlot.getComponent(EmptySlot);
+        currentThrowableLetter = throwAbleObject.getComponent(ThrowableLetter);
 
 
+        const interactionKeyBinding = new KeyBinding('Space', () => onHandleInteraction(), 'keydown');
+        const interactionKeyBindingUp = new KeyBinding('0', () => onHandleInteraction(), 'pointerdown');
+    }
 
+    displayAllEmptySlots(app, splitSentence);
 
-
-    const newEmptySlot = createSlotGameObject(app);
-
-    newEmptySlot.holder.x = 100;
-    newEmptySlot.holder.y = 100;
-
-    const bottomScreenBounds = new Bounds(0, 0, app.screen.width, app.screen.height);
-    const throwAbleObject = createThrowableLetterGameObject(app, new GamePlayVector2(newEmptySlot.holder.x, bottomScreenBounds.height - 100));
-
-    currentThrowableLetter = throwAbleObject.getComponent(ThrowableLetter);
-    currentEmptySlot = newEmptySlot.getComponent(EmptySlot);
+    sendLetterToSlot(currentFocusedSlotIndex);
 }
 
 
@@ -68,9 +94,9 @@ function createThrowableLetterGameObject(app: Application, assignedSlotPos: Game
     const throwPhysicsComponent = new ThrowBehavior();
     letterGameObject.addComponent(throwPhysicsComponent);
 
-    setTimeout(() => {
-        throwPhysicsComponent.throwObject();
-    }, 1000);
+    // setTimeout(() => {
+    //     throwPhysicsComponent.throwObject();
+    // }, 1000);
 
     return letterGameObject;
 }
