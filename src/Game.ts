@@ -1,5 +1,5 @@
-import { Component, GameObject } from "@willyuum/pixi-gameobject-system"
-import { Application, Bounds, Graphics } from "pixi.js";
+import { GameObject } from "@willyuum/pixi-gameobject-system"
+import { Application, Bounds } from "pixi.js";
 import { ThrowBehavior } from "./components/ThrowBehavior";
 import { ThrowableLetter } from "./components/ThrowableLetter";
 import { EmptySlot } from "./components/EmptySlot";
@@ -29,10 +29,12 @@ export function startGame(app: Application) {
 
     }
 
+    let currentEmptySlot: EmptySlot | undefined = undefined;
+    let currentThrowableLetter: ThrowableLetter | undefined = undefined;
+    let currentFocusedSlotIndex = 0;
 
     const onHandleInteraction = () => {
         const isThrown = currentThrowableLetter?.isThrown;
-        // const isNearEmptySlot = currentEmptySlot?.gameObject?.holder.getBounds().contains(currentTrhowableLetter?.gameObject.holder.x ?? 0, currentTrhowableLetter?.gameObject.holder.y ?? 0) ?? false;
         const emptySlotPosition = currentEmptySlot?.gameObject?.holder.position;
         const letterPosition = currentThrowableLetter?.gameObject?.holder.position;
 
@@ -42,14 +44,21 @@ export function startGame(app: Application) {
 
         if (isThrown && isInRange) {
             currentThrowableLetter?.gameObject?.getComponent(ThrowBehavior)?.DisableThrowBehavior();
+            currentThrowableLetter?.destroy();
             currentEmptySlot?.disableSlot();
+
+            currentFocusedSlotIndex += 1;
+            if (currentFocusedSlotIndex >= spawnedSlots.length) {
+                //Should end the game here
+                console.log("Game Over! All letters placed.");
+                return;
+            } else {
+                sendLetterToSlot(currentFocusedSlotIndex);
+            }
         }
     }
 
-    let currentEmptySlot: EmptySlot | undefined = undefined;
-    let currentThrowableLetter: ThrowableLetter | undefined = undefined;
 
-    let currentFocusedSlotIndex = 0;
     const sendLetterToSlot = (index: number) => {
         if (index < 0 || index >= spawnedSlots.length) {
             console.warn("Index out of bounds:", index);
@@ -62,14 +71,14 @@ export function startGame(app: Application) {
 
         currentEmptySlot = currentSlot.getComponent(EmptySlot);
         currentThrowableLetter = throwAbleObject.getComponent(ThrowableLetter);
-
-
-        const interactionKeyBinding = new KeyBinding('Space', () => onHandleInteraction(), 'keydown');
-        const interactionKeyBindingUp = new KeyBinding('0', () => onHandleInteraction(), 'pointerdown');
     }
 
-    displayAllEmptySlots(app, splitSentence);
+    const bindedKeys = [
+        new KeyBinding('Space', () => onHandleInteraction(), 'keydown'),
+        new KeyBinding('0', () => onHandleInteraction(), 'pointerdown'),
+    ];
 
+    displayAllEmptySlots(app, splitSentence);
     sendLetterToSlot(currentFocusedSlotIndex);
 }
 
@@ -87,16 +96,10 @@ function createThrowableLetterGameObject(app: Application, assignedSlotPos: Game
     const letterComponent = new ThrowableLetter();
     letterGameObject.addComponent(letterComponent);
 
-
     letterGameObject.holder.position.set(assignedSlotPos.x, assignedSlotPos.y);
-
 
     const throwPhysicsComponent = new ThrowBehavior();
     letterGameObject.addComponent(throwPhysicsComponent);
-
-    // setTimeout(() => {
-    //     throwPhysicsComponent.throwObject();
-    // }, 1000);
 
     return letterGameObject;
 }
@@ -108,45 +111,27 @@ export class KeyBinding {
         private action: () => void,
         private eventType: 'keydown' | 'keyup' | 'pointerdown' | 'pointerup',
     ) {
-        this.mapKeysToAction();
+        this.bind();
     }
 
     private onKeyEvent = (e: PointerEvent | KeyboardEvent | any) => {
-        const isPointerEvent = e instanceof PointerEvent;
-        const isKeyEvent = e instanceof KeyboardEvent;
-
-        switch (true) {
-            case isPointerEvent:
-                if (e.button.toString() === this.key) {
-                    this.action();
-                }
-                break;
-            case isKeyEvent:
-                if (e.code === this.key) {
-                    this.action();
-                }
-                break;
-            default:
-                console.warn("Unhandled event type:", e);
-                return;
+        if (e instanceof PointerEvent && e.button.toString() === this.key) {
+            this.action();
+        } else if (e instanceof KeyboardEvent && e.code === this.key) {
+            this.action();
         }
     };
 
-
-    public toggle(boolean: boolean) {
-        if (boolean) {
-            this.mapKeysToAction();
-        } else {
-            this.unbindKey();
-        }
-    }
-
-    private mapKeysToAction() {
+    public bind() {
         window.addEventListener(this.eventType, this.onKeyEvent);
     }
 
-    private unbindKey() {
+    public unbind() {
         window.removeEventListener(this.eventType, this.onKeyEvent);
+    }
+
+    public toggle(enabled: boolean) {
+        enabled ? this.bind() : this.unbind();
     }
 }
 
