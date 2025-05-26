@@ -1,5 +1,5 @@
 import { GameObject } from "@willyuum/pixi-gameobject-system"
-import { Application, Bounds } from "pixi.js";
+import { Application } from "pixi.js";
 import { ThrowBehavior } from "./components/ThrowBehavior";
 import { ThrowableLetter } from "./components/ThrowableLetter";
 import { EmptySlot } from "./components/EmptySlot";
@@ -7,12 +7,10 @@ import { GamePlayVector2 } from "./types";
 import { KeyBinding } from "./KeyBinding";
 import { PixiApp } from ".";
 
-
 type GameAction =
     | { type: 'INIT'; sentence: string[] }
-    | { type: 'THROW_LETTER'; }
+    | { type: 'THROW_LETTER' }
     | { type: 'HANDLE_INTERACTION' };
-
 
 type GameState = {
     sentence: string[];
@@ -28,8 +26,12 @@ let gameState: GameState = {
     slots: [],
 };
 
+type ReducerResult = {
+    state: GameState;
+    nextAction?: GameAction;
+};
 
-function reducer(state: GameState, action: GameAction): GameState {
+function reducer(state: GameState, action: GameAction): ReducerResult {
     switch (action.type) {
         case 'INIT': {
             const slots = action.sentence.map((_, i) => {
@@ -39,10 +41,12 @@ function reducer(state: GameState, action: GameAction): GameState {
             });
 
             return {
-                ...state,
-                sentence: action.sentence,
-                slots,
-                currentIndex: 0,
+                state: {
+                    ...state,
+                    sentence: action.sentence,
+                    slots,
+                    currentIndex: 0,
+                }
             };
         }
 
@@ -55,72 +59,95 @@ function reducer(state: GameState, action: GameAction): GameState {
             const newGameInput = new ThrowLetterAction();
             newGameInput.enableInputHandlers();
 
-
             return {
-                ...state,
-                currentSlot: currentSlot.getComponent(EmptySlot),
-                currentLetter: letterGO.getComponent(ThrowableLetter),
+                state: {
+                    ...state,
+                    currentSlot: currentSlot.getComponent(EmptySlot),
+                    currentLetter: letterGO.getComponent(ThrowableLetter),
+                }
             };
         }
 
         case 'HANDLE_INTERACTION': {
             const { currentSlot, currentLetter, currentIndex, slots } = state;
 
-            console.log("Handling interaction for index:", currentIndex);
+            if (!currentSlot || !currentLetter) return { state };
 
-            const slotY = currentSlot?.gameObject?.holder.y ?? 0;
-            const letterY = currentLetter?.gameObject?.holder.y ?? 0;
-            const isThrown = currentLetter?.isThrown;
+            const slotY = currentSlot.gameObject?.holder.y ?? 0;
+            const letterY = currentLetter.gameObject?.holder.y ?? 0;
+            const isThrown = currentLetter.isThrown;
             const inRange = Math.abs(slotY - letterY) < 45;
 
-            if (!isThrown || !inRange) return state;
+            if (!isThrown || !inRange) return { state };
 
             currentLetter?.gameObject?.getComponent(ThrowBehavior)?.DisableThrowBehavior();
-            currentLetter?.destroy();
-            currentSlot?.disableSlot();
+            currentLetter.destroy();
+            currentSlot.disableSlot();
 
-            if (currentIndex + 1 >= slots.length) {
+            const nextIndex = currentIndex + 1;
+
+            if (nextIndex >= slots.length) {
                 console.log("Game Over! All letters placed.");
-                return { ...state, currentIndex: currentIndex + 1 };
+                return {
+                    state: {
+                        ...state,
+                        currentIndex: nextIndex,
+                        currentSlot: undefined,
+                        currentLetter: undefined,
+                    }
+                };
             }
 
-            return { ...state, currentIndex: currentIndex + 1 };
+            const nextSlot = slots[nextIndex].getComponent(EmptySlot);
+
+            return {
+                state: {
+                    ...state,
+                    currentIndex: nextIndex,
+                    currentSlot: nextSlot,
+                    currentLetter: undefined,
+                },
+                nextAction: { type: 'THROW_LETTER' }
+            };
         }
 
         default: {
-            // Exhaustive check for action
             const _exhaustiveCheck: never = action;
-            console.warn("Unhandled state", _exhaustiveCheck);
-            return state;
+            console.warn("Unhandled action:", _exhaustiveCheck);
+            return { state };
         }
     }
 }
 
-export function startGame() {
+function dispatch(action: GameAction) {
+    const result = reducer(gameState, action);
+    gameState = result.state;
 
-    const clean = "Hello World!".replace(/\s+/g, '').split('');
-    gameState = reducer(gameState, { type: 'INIT', sentence: clean });
-    gameState = reducer(gameState, { type: 'THROW_LETTER' });
+    if (result.nextAction) {
+        dispatch(result.nextAction);
+    }
 }
 
-
+export function startGame() {
+    const clean = "Hello World!".replace(/\s+/g, '').split('');
+    dispatch({ type: 'INIT', sentence: clean });
+    dispatch({ type: 'THROW_LETTER' });
+}
 
 class ThrowLetterAction {
     keyBindings: KeyBinding[] = [];
     enableInputHandlers() {
         this.keyBindings = [
-            new KeyBinding('Space', () => reducer(gameState, { type: 'HANDLE_INTERACTION' }), 'keydown'),
-            new KeyBinding('0', () => reducer(gameState, { type: 'HANDLE_INTERACTION' }), 'pointerdown'),
-        ]
+            new KeyBinding('Space', () => dispatch({ type: 'HANDLE_INTERACTION' }), 'keydown'),
+            new KeyBinding('0', () => dispatch({ type: 'HANDLE_INTERACTION' }), 'pointerdown'),
+        ];
     }
 
     disableInputHandlers() {
         this.keyBindings.forEach(binding => binding.toggle(false));
         this.keyBindings = [];
     }
-
 }
-
 
 function createSlotGameObject(app: Application): GameObject {
     const slotGameObject = new GameObject("Slot", app.stage);
@@ -128,7 +155,6 @@ function createSlotGameObject(app: Application): GameObject {
     slotGameObject.addComponent(slotComponent);
     return slotGameObject;
 }
-
 
 function createThrowableLetterGameObject(app: Application, assignedSlotPos: GamePlayVector2): GameObject {
     const letterGameObject = new GameObject("ThrowableLetter", app.stage);
